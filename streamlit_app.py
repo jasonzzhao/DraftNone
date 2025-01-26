@@ -1,53 +1,48 @@
 import streamlit as st
-from openai import OpenAI
+from io import BytesIO
+from pydub import AudioSegment
+from fpdf import FPDF
+import base64
 
-# Show title and description.
-st.title("📄 Document question answering")
+# Show title and description
+st.title("🚔 Police Incident Report Drafter")
 st.write(
-    "Upload a document below and ask a question about it – GPT will answer! "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
+    "Upload an audio file (MP3 or WAV) containing details of a police incident, and this app will generate a PDF report!"
 )
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# Let the user upload an audio file
+uploaded_file = st.file_uploader("Upload an audio file", type=("mp3", "wav"))
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+if uploaded_file:
+    # Convert the uploaded audio file to text (placeholder logic)
+    st.audio(uploaded_file, format="audio/mp3")  # Play the uploaded audio
+    audio = AudioSegment.from_file(uploaded_file)
 
-    # Let the user upload a file via `st.file_uploader`.
-    uploaded_file = st.file_uploader(
-        "Upload a document (.txt or .md)", type=("txt", "md")
+    # Placeholder for transcription (replace with an actual transcription tool like OpenAI Whisper or similar)
+    transcription = "This is a placeholder transcription of the audio file."
+
+    # Create a PDF report
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Police Incident Report", ln=True, align="C")
+    pdf.ln(10)
+    pdf.multi_cell(0, 10, txt=transcription)
+
+    # Save PDF to a BytesIO object
+    pdf_output = BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
+
+    # Display the PDF in the app
+    base64_pdf = base64.b64encode(pdf_output.read()).decode('utf-8')
+    pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="500" type="application/pdf"></iframe>'
+    st.markdown(pdf_display, unsafe_allow_html=True)
+
+    # Provide a download link for the PDF
+    st.download_button(
+        label="Download Incident Report PDF",
+        data=pdf_output,
+        file_name="incident_report.pdf",
+        mime="application/pdf",
     )
-
-    # Ask the user for a question via `st.text_area`.
-    question = st.text_area(
-        "Now ask a question about the document!",
-        placeholder="Can you give me a short summary?",
-        disabled=not uploaded_file,
-    )
-
-    if uploaded_file and question:
-
-        # Process the uploaded file and question.
-        document = uploaded_file.read().decode()
-        messages = [
-            {
-                "role": "user",
-                "content": f"Here's a document: {document} \n\n---\n\n {question}",
-            }
-        ]
-
-        # Generate an answer using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            stream=True,
-        )
-
-        # Stream the response to the app using `st.write_stream`.
-        st.write_stream(stream)
